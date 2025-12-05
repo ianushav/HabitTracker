@@ -7,7 +7,7 @@ import {
 } from "react-icons/fi";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from "date-fns";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://habittracker-133y.onrender.com";
 
 // Predefined colors for habits
 const HABIT_COLORS = [
