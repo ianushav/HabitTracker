@@ -2,12 +2,12 @@ import React, { useEffect, useState, useRef } from "react";
 import "../styles/dashboard.css";
 import {
   FiPlus, FiCheck, FiTrendingUp, FiCalendar, FiActivity,
-  FiBarChart2, FiLogOut, FiUser, FiSettings, FiBell,
+  FiBarChart2, FiLogOut, FiUser, FiSettings,
   FiChevronLeft, FiChevronRight, FiEdit, FiTrash2, FiX, FiSave
 } from "react-icons/fi";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from "date-fns";
 
-const API_URL = "https://habittracker-133y.onrender.com";
+const API_URL = "https://habittracker-133y.onrender.com/api";
 
 // Predefined colors for habits
 const HABIT_COLORS = [
@@ -41,9 +41,14 @@ export default function Dashboard() {
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
-      const parsedUser = JSON.parse(userData);
-      setUser(parsedUser);
-      fetchUserData(parsedUser.id);
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        fetchUserData(parsedUser.id);
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        window.location.href = "/";
+      }
     } else {
       window.location.href = "/";
     }
@@ -51,19 +56,30 @@ export default function Dashboard() {
 
   const fetchUserData = async (userId) => {
     try {
+      console.log("Fetching data for user:", userId);
+      
       const [habitsRes, statsRes] = await Promise.all([
         fetch(`${API_URL}/users/${userId}/habits`),
         fetch(`${API_URL}/users/${userId}/stats`)
       ]);
       
+      console.log("Habits response:", habitsRes.status);
+      console.log("Stats response:", statsRes.status);
+      
       if (habitsRes.ok && statsRes.ok) {
         const habitsData = await habitsRes.json();
         const statsData = await statsRes.json();
+        
+        console.log("Habits data:", habitsData);
+        console.log("Stats data:", statsData);
         
         setHabits(habitsData);
         setStats(statsData);
       } else {
         console.error("Failed to fetch data");
+        if (habitsRes.status === 404) {
+          console.error("User not found or no habits");
+        }
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -75,17 +91,31 @@ export default function Dashboard() {
   const handleAddHabit = async (e) => {
     e.preventDefault();
     try {
+      console.log("Adding habit with data:", {
+        ...newHabit,
+        user_id: user.id,
+        target_days: 1
+      });
+      
       const response = await fetch(`${API_URL}/habits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...newHabit,
+          title: newHabit.title,
+          description: newHabit.description,
+          frequency: newHabit.frequency,
+          color: newHabit.color,
           user_id: user.id,
           target_days: 1
         })
       });
 
+      console.log("Add habit response status:", response.status);
+      
       if (response.ok) {
+        const data = await response.json();
+        console.log("Habit created successfully:", data);
+        
         setShowAddHabit(false);
         setNewHabit({
           title: "",
@@ -96,7 +126,8 @@ export default function Dashboard() {
         fetchUserData(user.id);
       } else {
         const errorData = await response.json();
-        alert(`Error adding habit: ${errorData.message}`);
+        console.error("Server error:", errorData);
+        alert(`Error adding habit: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error adding habit:", error);
@@ -105,48 +136,64 @@ export default function Dashboard() {
   };
 
   const handleUpdateHabit = async (e) => {
-  e.preventDefault();
-  try {
-    const response = await fetch(`${API_URL}/habits/${editingHabit.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: editingHabit.title,
-        description: editingHabit.description,
-        frequency: editingHabit.frequency,
-        color: editingHabit.color
-      })
-    });
+    e.preventDefault();
+    try {
+      console.log("Updating habit with data:", editingHabit);
+      
+      const response = await fetch(`${API_URL}/habits/${editingHabit.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editingHabit.title,
+          description: editingHabit.description,
+          frequency: editingHabit.frequency,
+          color: editingHabit.color
+        })
+      });
 
-    if (response.ok) {
-      setEditingHabit(null);
-      fetchUserData(user.id);
-    } else {
-      const errorData = await response.json();
-      alert(`Error updating habit: ${errorData.message}`);
+      console.log("Update habit response status:", response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Habit updated successfully:", data);
+        
+        setEditingHabit(null);
+        fetchUserData(user.id);
+      } else {
+        const errorData = await response.json();
+        console.error("Server error:", errorData);
+        alert(`Error updating habit: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error("Error updating habit:", error);
+      alert("Error updating habit. Please try again.");
     }
-  } catch (error) {
-    console.error("Error updating habit:", error);
-    alert("Error updating habit. Please try again.");
-  }
-};
+  };
 
   const handleDeleteHabit = async (habitId) => {
-    if (!window.confirm("Are you sure you want to delete this habit?")) {
+    if (!window.confirm("Are you sure you want to delete this habit? This will delete all completion history too.")) {
       return;
     }
 
     try {
+      console.log("Deleting habit:", habitId);
+      
       const response = await fetch(`${API_URL}/habits/${habitId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" }
       });
 
+      console.log("Delete habit response status:", response.status);
+      
       if (response.ok) {
+        const data = await response.json();
+        console.log("Habit deleted successfully:", data);
+        
         fetchUserData(user.id);
       } else {
         const errorData = await response.json();
-        alert(`Error deleting habit: ${errorData.message}`);
+        console.error("Server error:", errorData);
+        alert(`Error deleting habit: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error deleting habit:", error);
@@ -173,12 +220,15 @@ export default function Dashboard() {
         body: JSON.stringify({ date })
       });
       
+      console.log("Toggle response status:", response.status);
+      
       if (response.ok) {
         console.log(`${isCompleted ? 'Uncompleted' : 'Completed'} habit for:`, date);
         fetchUserData(user.id);
       } else {
         const errorData = await response.json();
-        alert(`Error: ${errorData.message}`);
+        console.error("Server error:", errorData);
+        alert(`Error: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error toggling habit:", error);
@@ -248,6 +298,16 @@ export default function Dashboard() {
   };
 
   const todayCompletion = calculateTodayCompletion();
+
+  const handleEditClick = (habit) => {
+    setEditingHabit({
+      id: habit.id,
+      title: habit.title,
+      description: habit.description || '',
+      frequency: habit.frequency,
+      color: habit.color || HABIT_COLORS[0]
+    });
+  };
 
   if (loading) {
     return (
@@ -535,7 +595,7 @@ export default function Dashboard() {
                           <div className="habit-actions">
                             <button 
                               className="edit-btn"
-                              onClick={() => setEditingHabit(habit)}
+                              onClick={() => handleEditClick(habit)}
                               title="Edit Habit"
                             >
                               <FiEdit />
@@ -628,6 +688,22 @@ export default function Dashboard() {
                 </select>
               </div>
               
+              <div className="form-group">
+                <label>Color</label>
+                <div className="color-picker">
+                  {HABIT_COLORS.map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`color-option ${newHabit.color === color ? 'selected' : ''}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setNewHabit({...newHabit, color})}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+              
               <div className="modal-actions">
                 <button type="button" className="secondary-btn" onClick={() => setShowAddHabit(false)}>
                   <FiX />
@@ -689,6 +765,22 @@ export default function Dashboard() {
                 </select>
               </div>
               
+              <div className="form-group">
+                <label>Color</label>
+                <div className="color-picker">
+                  {HABIT_COLORS.map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`color-option ${editingHabit.color === color ? 'selected' : ''}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setEditingHabit({...editingHabit, color})}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+              
               <div className="modal-actions">
                 <button type="button" className="secondary-btn" onClick={() => setEditingHabit(null)}>
                   <FiX />
@@ -705,4 +797,4 @@ export default function Dashboard() {
       )}
     </div>
   );
-}
+} 
