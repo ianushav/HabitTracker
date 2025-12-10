@@ -520,6 +520,15 @@ def toggle_habit_active(habit_id):
 if __name__ == '__main__':
     print("🚀 Starting Habit Tracker Backend...")
     print("📊 Database: habits.db (SQLite)")
-    print("🌐 API: http://localhost:5000")
-    print("✅ Health check: http://localhost:5000/api/health")
+    print("🌐 API: https://habittracker-133y.onrender.com")
+    print("✅ Health check: https://habittracker-133y.onrender.com/api/health")
     app.run(debug=True, port=5000)
+
+    # CORS headers middleware
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
